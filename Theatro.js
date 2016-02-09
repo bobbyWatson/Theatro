@@ -26,6 +26,11 @@ var THEATRO = new (function THEATRO(){
     var _this = this;
     var game = false;
     var canvas = false;
+    var oldTimeStamp = +(new Date());
+    var maxDeltaTime;
+    var imgCounter = 0;
+    var audioCounter = 0;
+    var isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
 
     //PUBLICS
     this.CONFIG_PATH = "./Config.js";
@@ -55,7 +60,6 @@ var THEATRO = new (function THEATRO(){
         //Adding to correct Layer
         if(THEATRO.prototype.entities[this.layer] === undefined){
             //create layer if needed
-            console.log(this.layer);
             THEATRO.prototype.entities[this.layer] = [];
             _this.allLayers.push(this.layer);
         }
@@ -155,7 +159,6 @@ var THEATRO = new (function THEATRO(){
         else{
             this.id =id;
             this.enable = true;
-            console.log(layer, targetLayers);
             if(layer !== undefined && typeof layer !== "number")
                 printError("System layer must be a number or undefined");
             this.layer = layer || 0;
@@ -398,7 +401,7 @@ var THEATRO = new (function THEATRO(){
                 //canvas Creation
                 canvas = document.createElement("canvas");
                 canvas.id = "GameCanvas";
-                canvas.classList.add("GameCanvas");
+                canvas.className= "GameCanvas";
                 var root = document.body;
                 if(_this.config.ROOT !== undefined)
                     root = Document.getElementById(_this.config.ROOT);
@@ -411,59 +414,91 @@ var THEATRO = new (function THEATRO(){
                 game = new Game(canvas);
 
                 //Asset Loading
-                //counting all assets
-                _this.totalAssets = _this.config.COMPONENTS.length + _this.config.SYSTEMS.length + _this.config.PREFABS.length + _this.config.SCRIPTS.length +
-                    _this.config.AUDIOS.length + _this.config.IMAGES.length;
+                //get all assets
+                //Images
+                _this.imageNames = [];
+                _this.imagesPromise = $.Deferred(function(){ getFilesName(_this.config.IMAGES, "imageNames", "imagesPromise")});
+                //Sounds
+                _this.soundsNames = [];
+                _this.soundsPromise = $.Deferred(function(){ getFilesName(_this.config.AUDIOS, "soundsNames", "soundsPromise")});
+                //Components
+                _this.componentsNames = [];
+                _this.componentPromise= $.Deferred(function(){ getFilesName(_this.config.COMPONENTS, "componentsNames", "componentPromise")});
+                //Systems
+                _this.systemsNames = [];
+                _this.systemPromise= $.Deferred(function(){ getFilesName(_this.config.SYSTEMS, "systemsNames", "systemPromise")});
+                //Modules
+                _this.modulesNames = [];
+                _this.modulesPromise= $.Deferred(function(){ getFilesName(_this.config.MODULES, "modulesNames", "modulesPromise")});
+                //Prefabs
+                _this.prefabsNames = [];
+                _this.prefabsPromise= $.Deferred(function(){ getFilesName(_this.config.PREFABS, "prefabsNames", "prefabsPromise")});
+                //Scripts
+                _this.scriptsNames = [];
+                _this.scriptsPromise= $.Deferred(function(){ getFilesName(_this.config.SCRIPTS, "scriptsNames", "scriptsPromise")});
 
-                //the promises used to load assets
-                _this.componentPromise = (_this.config.COMPONENTS.length > 0 ? $.Deferred(function(){getJSFile("componentPromise", "COMPONENTS")}) : undefined);
-                _this.systemPromise = (_this.config.SYSTEMS.length > 0 ? $.Deferred(function(){getJSFile("systemPromise", "SYSTEMS")}) : undefined);
-                _this.modulesPromise = (_this.config.MODULES.length > 0 ? $.Deferred(function(){getJSFile("modulesPromise", "MODULES")}) : undefined);
-                _this.prefabsPromise = (_this.config.PREFABS.length > 0 ? $.Deferred(function(){getJSFile("prefabsPromise", "PREFABS")}) : undefined);
-                _this.imagesPromise = (_this.config.IMAGES.length > 0 ? $.Deferred(function(){ getImages(game)}) : undefined);
-                _this.soundsPromise = (_this.config.AUDIOS.length > 0 ? $.Deferred(function(){ getSounds(game)}) : undefined);
-                _this.scriptsPromise = (_this.config.SCRIPTS.length > 0 ? $.Deferred(function(){getJSFile("scriptsPromise", "SCRIPTS", game);}): undefined);
+                $.when(_this.imagesPromise, this.soundsPromise, _this.componentPromise, _this.systemPromise, _this.modulesPromise, _this.prefabsPromise, _this.scriptsPromise).done(function(){
 
-                //Load Components, Systems and prefabs
-                $.when(_this.componentPromise, _this.systemPromise, _this.prefabsPromise).done(function(){
-                    //add all systems to system list
-                    setSystemsList();
+                    //counting all assets
+                    _this.totalAssets = _this.componentsNames.length + _this.systemsNames.length + _this.prefabsNames.length + _this.scriptsNames.length +
+                        _this.soundsNames.length + _this.imageNames.length;
 
-                    //Load Images and Audios
-                    $.when(_this.imagesPromise, _this.soundsPromise).done(function(){
+                    //the promises used to load assets
+                    _this.componentPromise = (_this.componentsNames.length > 0 ? $.Deferred(function(){getJSFile("componentPromise", _this.componentsNames)}) : undefined);
+                    _this.systemPromise = (_this.systemsNames.length > 0 ? $.Deferred(function(){getJSFile("systemPromise", _this.systemsNames)}) : undefined);
+                    _this.modulesPromise = (_this.modulesNames.length > 0 ? $.Deferred(function(){getJSFile("modulesPromise", _this.modulesNames)}) : undefined);
+                    _this.prefabsPromise = (_this.prefabsNames.length > 0 ? $.Deferred(function(){getJSFile("prefabsPromise", _this.prefabsNames)}) : undefined);
+                    _this.imagesPromise = (_this.imageNames.length > 0 ? $.Deferred(function(){ getImages(game)}) : undefined);
+                    _this.scriptsPromise = (_this.scriptsNames.length > 0 ? $.Deferred(function(){getJSFile("scriptsPromise", _this.scriptsNames, game);}): undefined);
 
-                        //Load scripts
-                        $.when(_this.scriptsPromise).done(function(){
-                            //delete completed promises
-                            delete _this.componentPromise;
-                            delete _this.systemPromise;
-                            delete _this.modulesPromise;
-                            delete _this.prefabsPromise;
-                            delete _this.imagesPromise;
-                            delete _this.soundsPromise;
-                            delete _this.scriptsPromise;
-                            //disable the basics set to false in the config file
-                            basicsEnabler();
-                            //end Initialisation
-                            _this.initilised = true;
-                            callback(game);
+                    //Load Components, Systems and prefabs
+                    $.when(_this.componentPromise, _this.systemPromise, _this.prefabsPromise).done(function(){
+                        //add all systems to system list
+                        setSystemsList();
+                        //Load Images and Audios
+                        $.when(_this.imagesPromise).done(function(){
+                            //Load scripts
+                            _this.soundsPromise = (_this.soundsNames.length > 0 ? $.Deferred(function(){ getSounds(game)}) : undefined);
+                            $.when(_this.scriptsPromise,undefined /*_this.soundsPromise*/).done(function(){
+                                console.log(game);
+                                //delete completed promises
+                                delete _this.componentPromise;
+                                delete _this.systemPromise;
+                                delete _this.modulesPromise;
+                                delete _this.prefabsPromise;
+                                delete _this.imagesPromise;
+                                delete _this.soundsPromise;
+                                delete _this.scriptsPromise;
+                                //disable the basics set to false in the config file
+                                basicsEnabler();
+                                //end Initialisation
+                                _this.initilised = true;
+                                callback(game);
+                            });
                         });
-
                     });
                 });
             }
         );
     };
 
+    function getFilesName(directory, stocking, promise){
+        $.get(_this.config.PHP + "/GetFilesInDirectoryDeep.php", {directory : directory},
+            function(res){
+            _this[stocking] = (JSON.parse(res));
+                _this[promise].resolve();
+        });
+    }
+
     //load all javascript files from a given category
     function getJSFile(promise, category, scope){
         scope = scope || _this;
         var counter = 0;
-        for(var i = 0, len = _this.config[category].length; i < len; ++i){
-            loadScript(_this.config[category][i], function(res){
+        for(var i = 0, len = category.length; i < len; ++i){
+            loadScript( (_this.config.PHP_BACK || "./") + category[i], function(res){
                 new Function(res).apply(scope);
                 counter ++;
-                if(counter === _this.config[category].length) {
+                if(counter === category.length) {
                     _this[promise].resolve();
                 }
                 _this.loadedAssets++;
@@ -473,17 +508,16 @@ var THEATRO = new (function THEATRO(){
 
     //load all images
     function getImages(game){
-        var counter = 0;
-        for(var i = 0, len = _this.config.IMAGES.length; i < len; ++i){
+        for(var i = 0, len = _this.imageNames.length; i < len; ++i){
             var img = new Image();
-            img.src = _this.config.IMAGES[i] + "?v=" + Date.now();
-            var slash = _this.config.IMAGES[i].lastIndexOf("/") + 1;
-            slash = Math.max(slash, _this.config.IMAGES[i].lastIndexOf("\\") + 1);
-            var name = _this.config.IMAGES[i].substr(slash, _this.config.IMAGES[i].lastIndexOf(".") - slash);
+            img.src = (_this.config.PHP_BACK || "./") +  _this.imageNames[i] + "?v=" + Date.now();
+            var slash = _this.imageNames[i].lastIndexOf("/") + 1;
+            slash = Math.max(slash, _this.imageNames[i].lastIndexOf("\\") + 1);
+            var name = _this.imageNames[i].substr(slash, _this.imageNames[i].lastIndexOf(".") - slash);
             game.images[name] = img;
-            img.onload = (function (e) {
-                counter++;
-                if(counter === _this.config.IMAGES.length)
+            img.addEventListener("load", function (e) {
+                imgCounter++;
+                if(imgCounter >= _this.imageNames.length)
                     _this.imagesPromise.resolve("OK");
                 _this.loadedAssets++;
             });
@@ -492,27 +526,42 @@ var THEATRO = new (function THEATRO(){
 
     //load all audios
     function getSounds(game){
-        var counter = 0;
-        for(var i = 0, len = _this.config.AUDIOS.length; i < len; ++i){
+        console.log(isChrome);
+        audioCounter = 0;
+        for(var i = 0, len = _this.soundsNames.length; i < len; ++i){
             var audio = new Audio();
-            audio.src = _this.config.AUDIOS[i] + "?v=" + Date.now();
+            if(isChrome)
+                audio.preload = "none";
+            audio.src = (_this.config.PHP_BACK || "./") + _this.soundsNames[i] + "?v=" + Date.now();
             audio.autoplay = false;
-            var slash = _this.config.AUDIOS[i].lastIndexOf("/") + 1;
-            slash =  Math.max(slash, _this.config.AUDIOS[i].lastIndexOf("\\") + 1);
-            var name = _this.config.AUDIOS[i].substr(slash, _this.config.AUDIOS[i].lastIndexOf(".") - slash);
+            var slash = _this.soundsNames[i].lastIndexOf("/") + 1;
+            slash =  Math.max(slash, _this.soundsNames[i].lastIndexOf("\\") + 1);
+            var name = _this.soundsNames[i].substr(slash, _this.soundsNames[i].lastIndexOf(".") - slash);
             game.audios[name] = audio;
-
-            audio.addEventListener('canplaythrough', function(e) {
-                counter++;
-                if(counter === _this.config.AUDIOS.length)
-                    _this.soundsPromise.resolve("OK");
-                _this.loadedAssets++;
-            }, false);
+            if(!isChrome) {
+                audio.addEventListener('canplaythrough', function (e) {
+                    audioCounter++;
+                    if (audioCounter >= _this.soundsNames.length)
+                        _this.soundsPromise.resolve("OK");
+                    _this.loadedAssets++;
+                }, false);
+            }
+        }
+        if(isChrome){
+            _this.loadedAssets+= _this.soundsNames.length;
+            _this.soundsPromise.resolve("OK");
         }
     }
 
     //Update THEATRO
     THEATRO.prototype.update = function update(){
+        var timeStamp = +(new Date());
+        var deltaTime = (timeStamp - oldTimeStamp) / 100;
+        if(deltaTime > maxDeltaTime){
+            deltaTime = 0
+        }
+        oldTimeStamp = timeStamp;
+
         //loop through systems
         for(var i = 0, len = this.systemsList.length; i < len; ++i){
             if(this.systemsList[i].enable){
@@ -534,7 +583,7 @@ var THEATRO = new (function THEATRO(){
                         }
                         // if the entity has the required components and is in a good layer
                         if (bool) {
-                            this.systemsList[i].update.call(this.entities[layer][k]);
+                            this.systemsList[i].update.call(this.entities[layer][k], deltaTime);
                         }
                     }
                 }
@@ -647,7 +696,7 @@ var THEATRO = new (function THEATRO(){
 
     //region ** Basics systems **
     //Sprite Renderer
-    new this.System("SpriteRenderer", ["Transform", "Sprite"], function() {
+    new this.System("SpriteRenderer", ["Transform", "Sprite"], function(deltaTime) {
         var sprite = this.components.Sprite;
         var transform = this.components.Transform;
         var ratio = 1;
