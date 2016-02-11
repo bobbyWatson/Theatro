@@ -31,18 +31,6 @@ var i  = 0;
 
 function loop(){
     THEATRO.update();
-
-    if(gif !== undefined && gif.get_frames().length > 0) {
-        i++;
-        if (i > 5) {
-            i = 0;
-            frame++;
-            if(frame >= gif.get_frames().length)
-                frame = 1;
-        }
-        game.ctx.putImageData(gif.get_frames()[frame].data, 200, 200);
-    }
-
     requestAnimationFrame(loop);
 }
 
@@ -64,17 +52,22 @@ $(document).ready(function(){
         window.game = game;
         var entity = new THEATRO.Entity();
         entity.addComponent("Sprite",{
-            img : game.images.Nope,
-            size : {width : 160, height : 90},
+            img : THEATRO.AssetBundle.bundles.Main.images.falcon,
+            size : {width : 800, height : 600},
             reverse : true
         });
-        entity.components.Transform.position = {x : 80,y: 45};
-
-        gif = new SuperGif({gif : game.images.kids});
-        gif.load();
-
-
-        //console.log(THEATRO.createPrefab("Button"));
+        console.log(THEATRO.AssetBundle.bundles.Main);
+        entity.addComponent("Animations",{
+            animations : [THEATRO.AssetBundle.bundles.Main.animations.gallery]
+        });
+        entity.components.Transform.position = {x : 400,y: 300};
+/*
+        THEATRO.AssetBundle.imgPath = "./BUNDLE1";
+        THEATRO.AssetBundle.audioPath = "./BUNDLE1";
+        THEATRO.AssetBundle.loadAssets(function(){
+            print("toto");
+        });
+*/
 
         THEATRO.EventManager.subscribe("click", function(){console.log("click at " + THEATRO.eventSystems.Mouse.position.x + " / " + THEATRO.eventSystems.Mouse.position.y)});
 

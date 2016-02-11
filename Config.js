@@ -13,6 +13,7 @@ THEATRO.config = {
     IMAGES      : "./IMAGES",
     AUDIOS      : "./AUDIOS",
     MODULES     : "./MODULES",
+    ANIMATIONS  : "./ANIMATIONS",
     SCALE       : true,
     MOUSE       : true
 };
