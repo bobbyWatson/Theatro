@@ -30,7 +30,26 @@ var THEATRO = new (function THEATRO(){
     var maxDeltaTime        = 0.2;
     var imgCounter          = 0;
     var audioCounter        = 0;
-    var isChrome            = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+    //navigators
+    // Opera 8.0+
+    var isOpera     = (!!window.opr && !!opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
+    // Firefox 1.0+
+    var isFirefox   = typeof InstallTrigger !== 'undefined';
+    // At least Safari 3+: "[object HTMLElementConstructor]"
+    var isSafari    = Object.prototype.toString.call(window.HTMLElement).indexOf('Constructor') > 0;
+    // Internet Explorer 6-11
+    var isIE        = /*@cc_on!@*/false || !!document.documentMode;
+    // Edge 20+
+    var isEdge      = !isIE && !!window.StyleMedia;
+    // Chrome 1+
+    var isChrome    = !!window.chrome && !!window.chrome.webstore;
+
+    //buffer max sizes
+    var chromeBufferSize    = 16384;
+    var firefoxBufferSize   = 20992;
+    var ieBufferSize        = 8192;
+    var defaultBufferSize   = 4096;
+
     var currentAssetPackage = "Main";
 
     //PUBLICS
@@ -804,7 +823,6 @@ var THEATRO = new (function THEATRO(){
             );
         }
         game.ctx.restore();
-
     });
 
     new this.System("SpriteAnimator", ["Transform", "Sprite", "Animations"], function(deltaTime) {
@@ -857,15 +875,24 @@ var THEATRO = new (function THEATRO(){
                 audios      : {},
                 animations  : {},
                 pointer     : 0,
-                canvas      : document.createElement("canvas")
+                canvas      : [],
+                ctx  : []
             };
-            //set context
-            bundle.ctx = bundle.canvas.getContext("2d");
-            bundle.ctx.width = bundle.canvas.width = 2048;
-            bundle.ctx.height = bundle.canvas.height = 512;
+            //add first buffer
+            assetBundle.addBuffer(bundle);
             //add bundle
             this.bundles[id] = bundle;
             return bundle;
+        };
+
+        this.addBuffer = function addBuffer(bundle){
+            var maxSize = isChrome ? chromeBufferSize : isFirefox ? firefoxBufferSize : isIE ? ieBufferSize : defaultBufferSize;
+            var index = bundle.canvas.length;
+            bundle.canvas[index]        = document.createElement("canvas");
+            bundle.ctx[index]           = bundle.canvas[index].getContext("2d");
+            bundle.ctx[index].width     = bundle.canvas[index].width    = maxSize;
+            bundle.ctx[index].height    = bundle.canvas[index].height   = maxSize;
+            bundle.pointer = 0;
         };
 
         this.loadAssets = function loadAssets(bundle, callback){
@@ -915,6 +942,7 @@ var THEATRO = new (function THEATRO(){
         };
 
         this.addSprite = function addSprite(bundle, name, image){
+            var currentIndex = bundle.canvas.length-1;
             //check bundle existence
             if(typeof bundle === "string") {
                 if (this.bundles[bundle] === undefined) {
@@ -923,21 +951,18 @@ var THEATRO = new (function THEATRO(){
                 var bundle = this.bundles[bundle];
             }
             //add buffer height
-            while(bundle.ctx.height < image.height){
-                var imgData = bundle.ctx.getImageData(0,0,bundle.ctx.width, bundle.ctx.height);
-                bundle.ctx.height = bundle.canvas.height = bundle.canvas.height * 2;
-                bundle.ctx.putImageData(imgData,0,0);
+
+            if(bundle.ctx[currentIndex].height < image.height){
+                printError("image " + name + "is too hight for this navigator");
             }
-            //add buffer width
-            while(bundle.ctx.width - bundle.pointer < image.width){
-                var imgData = bundle.ctx.getImageData(0,0,bundle.ctx.width, bundle.ctx.height);
-                bundle.ctx.width = bundle.canvas.width = bundle.canvas.width*2;
-                bundle.ctx.putImageData(imgData,0,0);
+            if(bundle.ctx[currentIndex].width - bundle.pointer < image.width){
+                assetBundle.addBuffer(bundle);
+                currentIndex++;
             }
             //draw on buffer
-            bundle.ctx.drawImage(image, bundle.pointer,0);
+            bundle.ctx[currentIndex].drawImage(image, bundle.pointer, 0);
             //add image
-            bundle.images[name] = {buffer : bundle.canvas, x : bundle.pointer, y : 0, width : image.width, height: image.height};
+            bundle.images[name] = {buffer : bundle.canvas[currentIndex], x : bundle.pointer, y : 0, width : image.width, height: image.height};
             //set pointer postion
             bundle.pointer += image.width;
         }
